@@ -1,0 +1,26 @@
+{
+  "name": "pulsewave",
+  "version": "1.0.0",
+  "main": "app.js",
+  "scripts": {
+    "beta": "NODE_ENV=staging nodemon app.js",
+    "dev": "NODE_ENV=DEVELOPMENT nodemon app.js",
+    "prod": "NODE_ENV=PRODUCTION node app.js"
+  },
+  "keywords": [],
+  "author": "Abhishek Tiwari",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
+    "compression": "^1.7.4",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.7.3",
+    "morgan": "^1.10.0",
+    "nodemon": "^3.1.7"
+  }
+}
