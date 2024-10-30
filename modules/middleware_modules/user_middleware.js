@@ -55,4 +55,28 @@ const adminAuth = (req, res, next) => {
     }
 };
 
-module.exports = {auth , adminAuth, addTokenToBlacklist, isTokenBlacklisted };
+
+const beneficiaryAuth = (req, res, next) => {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
+        return res.status(401).json({ status: false, message: 'Authorization denied. No token provided.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Ensure the user is a customer
+        if (decoded.user_type !== 'customer') {
+            return res.status(403).json({ status: false, message: 'Access denied. Customers only.' });
+        }
+
+        req.user = decoded; // Attach decoded user info to request
+        next();
+    } catch (err) {
+        res.status(401).json({ status: false, message: 'Invalid token' });
+    }
+};
+
+
+module.exports = {auth , adminAuth, addTokenToBlacklist, isTokenBlacklisted, beneficiaryAuth };
