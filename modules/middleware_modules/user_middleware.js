@@ -21,11 +21,38 @@ const auth = async (req, res, next) => {
     }
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        req.user = decoded['_doc']; // Store userId in the request object
+        req.user = decoded; // Store userId in the request object
         next();
     } catch (err) {
         res.status(401).json({ status: false, message: 'Token is not valid' });
     }
 };
 
-module.exports = {auth , addTokenToBlacklist, isTokenBlacklisted };
+const adminAuth = (req, res, next) => {
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+
+    if (!token) {
+        return res.status(401).json({ status: false, message: 'Authorization denied. No token provided.' });
+    }
+
+    // Check if the token is blacklisted
+    if (isTokenBlacklisted(token)) {
+        return res.status(403).json({ status: false, message: 'Token is blacklisted. Please sign in again.' });
+    }
+
+    try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+
+        // Ensure the user is an admin
+        if (decoded.user_type !== 'admin') {
+            return res.status(403).json({ status: false, message: 'Access denied. Admins only.' });
+        }
+
+        req.user = decoded; // Attach decoded user info to the request
+        next();
+    } catch (err) {
+        res.status(401).json({ status: false, message: 'Invalid token' });
+    }
+};
+
+module.exports = {auth , adminAuth, addTokenToBlacklist, isTokenBlacklisted };
