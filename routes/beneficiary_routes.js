@@ -6,10 +6,8 @@ const { beneficiaryAuth } = require('../modules/middleware_modules/user_middlewa
 
 // Add Beneficiary
 router.post('/beneficiary', beneficiaryAuth, async (req, res) => {
-    const { account_number, ifsc_code, swift_code } = req.body;
-
+    const { account_number, ifsc_code, swift_code, nick_name, last_name, first_name, contact_number } = req.body;
     try {
-
         // Check if account_number already exists
         const existingBeneficiary = await Beneficiary.findOne({ account_number });
         if (existingBeneficiary) {
@@ -21,11 +19,14 @@ router.post('/beneficiary', beneficiaryAuth, async (req, res) => {
             ifsc_code,
             swift_code,
             account_number,
+            nick_name: nick_name,
+            last_name: last_name,
+            first_name: first_name,
             user_id: req.user._id, // From the decoded JWT payload
             username: req.user.username,
+            contact_number: contact_number,
             beneficiary_unique_code: beneficiary_unique_code,
         });
-
         await beneficiary.save();
         res.status(201).json({ status: true, message: 'Beneficiary added successfully', beneficiary });
     } catch (error) {
@@ -36,10 +37,10 @@ router.post('/beneficiary', beneficiaryAuth, async (req, res) => {
 
 // Update Beneficiary
 router.put('/beneficiary/:id', beneficiaryAuth, async (req, res) => {
-    const { beneficiary_unique_code, account_number, ifsc_code, swift_code } = req.body;
+    const { beneficiary_unique_code, account_number, ifsc_code, swift_code, first_name, last_name, nick_name, contact_number } = req.body;
 
     try {
-        if(!beneficiary_unique_code){
+        if (!beneficiary_unique_code) {
             return res.status(403).json({ status: false, message: 'Provide beneficiary_unique_code to update specific beneficiary.' });
 
         }
@@ -54,6 +55,10 @@ router.put('/beneficiary/:id', beneficiaryAuth, async (req, res) => {
         beneficiary.account_number = account_number || beneficiary.account_number;
         beneficiary.ifsc_code = ifsc_code || beneficiary.ifsc_code;
         beneficiary.swift_code = swift_code || beneficiary.swift_code;
+        beneficiary.first_name = first_name || beneficiary.first_name;
+        beneficiary.last_name = last_name || beneficiary.last_name;
+        beneficiary.nick_name = nick_name || beneficiary.nick_name;
+        beneficiary.contact_number = contact_number || beneficiary.contact_number;
 
         await beneficiary.save();
         res.json({ status: true, message: 'Beneficiary updated successfully', beneficiary });
@@ -82,8 +87,8 @@ router.delete('/beneficiary/:id', beneficiaryAuth, async (req, res) => {
 // View All Beneficiaries
 router.get('/beneficiaries', beneficiaryAuth, async (req, res) => {
     try {
-        const beneficiaries = await Beneficiary.find({ user_id: req.user._id });
-        res.json({ status: true, beneficiaries });
+        const beneficiaries = await Beneficiary.find({ user_id: req.user._id }).select('-username').select('-user_id');
+        return res.json({ status: true, beneficiaries });
     } catch (error) {
         res.status(500).json({ status: false, message: 'Server error', error });
     }

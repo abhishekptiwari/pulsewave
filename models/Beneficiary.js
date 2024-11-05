@@ -7,6 +7,21 @@ const BeneficiarySchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    nick_name: {
+        type: String,
+    },
+    last_name: {
+        type: String,
+        required: true
+    },
+    first_name: {
+        type: String,
+        required: true
+    },
+    contact_number: {
+        type: String,
+        required: true
+    },
     username: {
         type: String,
         required: true
