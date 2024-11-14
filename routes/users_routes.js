@@ -41,8 +41,6 @@ router.post('/signup', async (req, res) => {
 });
 
 
-
-
 router.post('/signin', async (req, res) => {
     const { username, password, user_type } = req.body;
 
@@ -71,7 +69,7 @@ router.post('/signin', async (req, res) => {
         }
 
         delete user['password'];
-        const token = jwt.sign({ ...user.toObject() }, JWT_SECRET, { expiresIn: '24h' });
+        const token = jwt.sign({ ...user.toObject() }, JWT_SECRET, { expiresIn: '168h' });
         return res.json({ status: true, message: 'Sign-in successful', token });
     } catch (error) {
         return res.status(500).json({ status: false, message: 'Server error', error });
@@ -107,13 +105,13 @@ router.post('/logout', auth, (req, res) => {
 // Get all users (Admin only)
 router.get('/getAllUsers', adminAuth, async (req, res) => {
     try {
-    const {  user_type } = req.body;
+        const { user_type } = req.body;
 
-        if(!user_type){
+        if (!user_type) {
             return res.status(400).json({ status: false, message: 'Provide valid user type.' });
-        }else{
-            const users = await User.find({user_type: user_type}).select('-password'); // Exclude password from the results
-            
+        } else {
+            const users = await User.find({ user_type: user_type }).select('-password'); // Exclude password from the results
+
             return res.json({ status: true, users });
         }
     } catch (error) {
@@ -121,4 +119,39 @@ router.get('/getAllUsers', adminAuth, async (req, res) => {
     }
 });
 
+
+router.post('/changePassword', auth, async (req, res) => {
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const user_id = req.user._id;  // Assuming user is authenticated and user ID is available from the JWT token
+
+    try {
+        // Validate if new password and confirm password match
+        if (newPassword !== confirmPassword) {
+            return res.status(400).json({ status: false, message: 'New password and confirm password do not match' });
+        }
+
+        // Find the user from the database
+        const user = await User.findById(user_id);
+        if (!user) {
+            return res.status(404).json({ status: false, message: 'User not found' });
+        }
+
+        // Check if current password matches
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ status: false, message: 'Current password is incorrect' });
+        }
+
+        // Hash the new password before saving it
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        // Update the user's password in the database
+        user.password = hashedPassword;
+        await user.save();
+
+        res.json({ status: true, message: 'Password updated successfully' });
+    } catch (error) {
+        res.status(500).json({ status: false, message: 'Server error', error });
+    }
+});
 module.exports = router;
