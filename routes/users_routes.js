@@ -97,8 +97,7 @@ router.get('/profile', auth, async (req, res) => {
         res.json({
             status: true,
             user: {
-                name: user.name,
-                email: user.email,
+                ...user._doc,
                 ifsc_code: fromUser ? fromUser.ifsc_code : null,
                 account_number: fromUser ? fromUser.account_number : null, // Assuming account_number is in the User schema
                 balance: balanceInfo ? balanceInfo.balance : 0, // Default to 0 if no balance record exists
