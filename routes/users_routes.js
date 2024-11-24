@@ -51,7 +51,6 @@ router.post('/signup', async (req, res) => {
     }
 });
 
-
 router.post('/signin', async (req, res) => {
     const { email, mobile, password, user_type } = req.body;
     try {
@@ -99,9 +98,6 @@ router.post('/signin', async (req, res) => {
         return res.status(500).json({ status: false, message: 'Server error', error });
     }
 });
-
-
-
 
 router.get('/profile', auth, async (req, res) => {
     try {

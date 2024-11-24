@@ -1,13 +1,102 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
-const Credit = require('../models/Credit');
+const User = require('../models/User');
 const Debit = require('../models/Debit');
+const Credit = require('../models/Credit');
 const Balance = require('../models/Balance');
 const Beneficiary = require('../models/Beneficiary');
+const Transaction = require('../models/Transaction');
 const Notification = require('../models/Notification');
 const { auth } = require('../modules/middleware_modules/user_middleware')
-const User = require('../models/User');
+
+// router.post('/transfer', auth, async (req, res) => {
+//     const { amount, credit_from_name, credit_from_account_number } = req.body;
+//     const from_user_id = req.user._id;
+
+//     try {
+//         const fromUser = await Beneficiary.findOne({ user_id: from_user_id });
+//         if (!fromUser) {
+//             return res.status(400).json({ status: false, message: 'Beneficiary details not found' });
+//         }
+
+//         // 1. Find recipient Beneficiary by name and account number
+//         const toUser = await Beneficiary.findOne({ account_number: credit_from_account_number });
+//         if (!toUser) {
+//             return res.status(400).json({ status: false, message: 'Recipient not found' });
+//         }
+
+//         const to_user_id = toUser.user_id;
+//         const to_ifsc_code = toUser.ifsc_code;
+//         const from_ifsc_code = fromUser.ifsc_code;
+
+//         // 2. Check for sufficient balance in sender's account
+//         const fromUserBalance = await Balance.findOne({ user_id: from_user_id });
+//         if (!fromUserBalance || fromUserBalance.balance < amount) {
+//             return res.status(400).json({ status: false, message: 'Insufficient funds' });
+//         }
+
+//         // 3. Deduct from sender's balance and log debit transaction
+//         const transaction_id = uuidv4();
+//         fromUserBalance.balance -= amount;
+//         await fromUserBalance.save();
+
+//         const debit = new Debit({
+//             amount,
+//             account_number: toUser.account_number, // assuming sender's account number is in the user model
+//             transaction_id,
+//             ifsc_code: from_ifsc_code,
+//             transaction_type: 'debit',
+//             debited_to: to_user_id,
+//             debited_from: from_user_id,
+//             date: new Date()
+//         });
+//         await debit.save();
+
+//         // 4. Credit to recipient's balance and log credit transaction
+//         let toUserBalance = await Balance.findOne({ user_id: to_user_id });
+//         if (!toUserBalance) {
+//             toUserBalance = new Balance({ user_id: to_user_id, balance: 0 });
+//         }
+//         toUserBalance.balance += amount;
+//         await toUserBalance.save();
+
+//         const credit = new Credit({
+//             amount,
+//             account_number: credit_from_account_number,
+//             transaction_id,
+//             ifsc_code: to_ifsc_code,
+//             transaction_type: 'credit',
+//             credited_to: to_user_id,
+//             credited_by: from_user_id,
+//             date: new Date()
+//         });
+//         await credit.save();
+
+//         // 5. Notifications for both users
+//         const fromNotification = new Notification({
+//             user_id: from_user_id,
+//             message: `You have successfully transferred ${amount} to ${credit_from_name}.`,
+//             transaction_id,
+//             date: new Date()
+//         });
+//         await fromNotification.save();
+
+//         const toNotification = new Notification({
+//             user_id: to_user_id,
+//             message: `You have received ${amount} from ${req.user.name}.`,
+//             transaction_id,
+//             date: new Date()
+//         });
+//         await toNotification.save();
+
+//         res.json({ status: true, message: 'Fund transferred successfully', transaction_id });
+//     } catch (error) {
+//         res.status(500).json({ status: false, message: 'Server error', error });
+//     }
+// });
+
+// API to add funds
 
 router.post('/transfer', auth, async (req, res) => {
     const { amount, credit_from_name, credit_from_account_number } = req.body;
@@ -19,40 +108,31 @@ router.post('/transfer', auth, async (req, res) => {
             return res.status(400).json({ status: false, message: 'Beneficiary details not found' });
         }
 
-        // 1. Find recipient Beneficiary by name and account number
         const toUser = await Beneficiary.findOne({ account_number: credit_from_account_number });
         if (!toUser) {
             return res.status(400).json({ status: false, message: 'Recipient not found' });
         }
 
         const to_user_id = toUser.user_id;
-        const to_ifsc_code = toUser.ifsc_code;
-        const from_ifsc_code = fromUser.ifsc_code;
-
-        // 2. Check for sufficient balance in sender's account
         const fromUserBalance = await Balance.findOne({ user_id: from_user_id });
+
         if (!fromUserBalance || fromUserBalance.balance < amount) {
             return res.status(400).json({ status: false, message: 'Insufficient funds' });
         }
 
-        // 3. Deduct from sender's balance and log debit transaction
         const transaction_id = uuidv4();
         fromUserBalance.balance -= amount;
         await fromUserBalance.save();
 
-        const debit = new Debit({
-            amount,
-            account_number: toUser.account_number, // assuming sender's account number is in the user model
+        await new Transaction({
+            user_id: from_user_id,
             transaction_id,
-            ifsc_code: from_ifsc_code,
-            transaction_type: 'debit',
-            debited_to: to_user_id,
-            debited_from: from_user_id,
-            date: new Date()
-        });
-        await debit.save();
+            type: 'debit',
+            amount,
+            description: `Transferred to ${credit_from_name} (Account: ${credit_from_account_number})`,
+            date: new Date(),
+        }).save();
 
-        // 4. Credit to recipient's balance and log credit transaction
         let toUserBalance = await Balance.findOne({ user_id: to_user_id });
         if (!toUserBalance) {
             toUserBalance = new Balance({ user_id: to_user_id, balance: 0 });
@@ -60,24 +140,21 @@ router.post('/transfer', auth, async (req, res) => {
         toUserBalance.balance += amount;
         await toUserBalance.save();
 
-        const credit = new Credit({
-            amount,
-            account_number: credit_from_account_number,
+        await new Transaction({
+            user_id: to_user_id,
             transaction_id,
-            ifsc_code: to_ifsc_code,
-            transaction_type: 'credit',
-            credited_to: to_user_id,
-            credited_by: from_user_id,
-            date: new Date()
-        });
-        await credit.save();
+            type: 'credit',
+            amount,
+            description: `Received from ${req.user.name} (Account: ${fromUser.account_number})`,
+            date: new Date(),
+        }).save();
 
         // 5. Notifications for both users
         const fromNotification = new Notification({
             user_id: from_user_id,
             message: `You have successfully transferred ${amount} to ${credit_from_name}.`,
             transaction_id,
-            date: new Date()
+            date: new Date(),
         });
         await fromNotification.save();
 
@@ -85,7 +162,7 @@ router.post('/transfer', auth, async (req, res) => {
             user_id: to_user_id,
             message: `You have received ${amount} from ${req.user.name}.`,
             transaction_id,
-            date: new Date()
+            date: new Date(),
         });
         await toNotification.save();
 
@@ -95,7 +172,7 @@ router.post('/transfer', auth, async (req, res) => {
     }
 });
 
-// API to add funds
+
 router.post('/addFunds', auth, async (req, res) => {
     const { amount, account_number, ifsc_code, swift_code } = req.body;
     const user_id = req.user._id;
@@ -121,9 +198,11 @@ router.post('/addFunds', auth, async (req, res) => {
         userBalance.balance += amount;
         await userBalance.save();
 
+        let transaction_id = uuidv4();
+
         // Log the credit transaction
         const credit = new Credit({
-            transaction_id: uuidv4(),
+            transaction_id: transaction_id,
             amount,
             account_number,
             ifsc_code,
@@ -134,6 +213,15 @@ router.post('/addFunds', auth, async (req, res) => {
             date: new Date()
         });
         await credit.save();
+
+        await new Transaction({
+            user_id: user_id,
+            transaction_id,
+            type: 'credit',
+            amount,
+            description: `Fund Added Successfully (Amount: ${amount})`,
+            date: new Date(),
+        }).save();
 
         // Create a notification
         const notificationMessage = `Your account has been credited with ${amount}. Your new balance is ${userBalance.balance}.`;
@@ -178,9 +266,10 @@ router.post('/withdrawFunds', auth, async (req, res) => {
         userBalance.balance -= amount;
         await userBalance.save();
 
+        let transaction_id = uuidv4();
         // Log the debit transaction
         const debit = new Debit({
-            transaction_id: uuidv4(),
+            transaction_id: transaction_id,
             amount,
             account_number,
             ifsc_code,
@@ -191,6 +280,15 @@ router.post('/withdrawFunds', auth, async (req, res) => {
             date: new Date()
         });
         await debit.save();
+
+        await new Transaction({
+            user_id: user_id,
+            transaction_id,
+            type: 'debit',
+            amount,
+            description: `Fund withdrawal Successfully (Amount: ${amount})`,
+            date: new Date(),
+        }).save();
 
         // Create a notification
         const notificationMessage = `Your account has been debited with ${amount}. Your new balance is ${userBalance.balance}.`;

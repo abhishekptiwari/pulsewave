@@ -7,7 +7,7 @@ const { adminAuth, auth, addTokenToBlacklist, isTokenBlacklisted } = require('..
 
 router.get('/statement', auth, async (req, res) => {
     try {
-        const transactions = await Transaction.find({ user_id: req.user._id });
+        const transactions = await Transaction.find({ user_id: req.user._id }).sort({_id:-1});
         res.json({ status: true, transactions });
     } catch (error) {
         res.status(500).json({ status: false, message: 'Server error', error });
