@@ -11,20 +11,28 @@ const User = require('../models/User');
 const JWT_SECRET = "411e2bbade89dfccddecfffe723419bce69fe34179720dc64d8a28e1670ff78a";
 
 router.post('/signup', async (req, res) => {
-    const { username, fullName, mobile, gender, address, email, password, confirmPassword } = req.body;
+    const { fullName, mobile, gender, address, email, password, user_type,  confirmPassword } = req.body;
 
+    // Check if passwords match
     if (password !== confirmPassword) {
         return res.status(400).json({ status: false, message: 'Passwords do not match' });
     }
 
     try {
+        // Check if the user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ status: false, message: 'User already exists with this email' });
         }
 
+        // Generate a random username based on fullName
+        const randomSuffix = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
+        const username = `${fullName.replace(/\s+/g, '').toLowerCase()}${randomSuffix}`; // e.g., johndoe1234
+
+        // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Create a new user
         const newUser = new User({
             username,
             fullName,
@@ -32,12 +40,12 @@ router.post('/signup', async (req, res) => {
             gender,
             address,
             email,
-            user_type: "customer",
+            user_type: user_type,
             password: hashedPassword,
         });
 
         await newUser.save();
-        res.status(201).json({ status: true, message: 'User registered successfully' });
+        res.status(201).json({ status: true, message: 'User registered successfully'});
     } catch (error) {
         res.status(500).json({ status: false, message: 'Server error', error });
     }
@@ -45,10 +53,13 @@ router.post('/signup', async (req, res) => {
 
 
 router.post('/signin', async (req, res) => {
-    const { username, password, user_type } = req.body;
-
+    const { email, mobile, password, user_type } = req.body;
     try {
-        const user = await User.findOne({ username });
+        // Find user by email or mobile
+        const user = await User.findOne({
+            $or: [{ email }, { mobile }],
+        });
+
         if (!user || !user.user_type) {
             return res.status(400).json({ status: false, message: 'Invalid credentials' });
         }
@@ -59,20 +70,30 @@ router.post('/signin', async (req, res) => {
         }
 
         // If user_type is admin, validate password from req.body without bcrypt
-        if (user_type === 'admin') {
-            if (password !== user.password) {
-                return res.status(400).json({ status: false, message: 'Invalid credentials' });
-            }
-        } else {
-            // For customers, validate password with bcrypt
-            const isMatch = await bcrypt.compare(password, user.password);
-            if (!isMatch) {
-                return res.status(400).json({ status: false, message: 'Invalid credentials' });
-            }
+        // if (user_type === 'admin') {
+        //     if (password !== user.password) {
+        //         return res.status(400).json({ status: false, message: 'Invalid credentials' });
+        //     }
+        // } else {
+        //     // For customers, validate password with bcrypt
+        //     const isMatch = await bcrypt.compare(password, user.password);
+        //     if (!isMatch) {
+        //         return res.status(400).json({ status: false, message: 'Invalid credentials' });
+        //     }
+        // }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ status: false, message: 'Invalid credentials' });
         }
 
-        delete user['password'];
-        const token = jwt.sign({ ...user.toObject() }, JWT_SECRET, { expiresIn: '168h' });
+        // Remove sensitive data like password
+        const userData = user.toObject();
+        delete userData.password;
+
+        // Generate JWT token
+        const token = jwt.sign(userData, JWT_SECRET, {});
+
         return res.json({ status: true, message: 'Sign-in successful', token });
     } catch (error) {
         return res.status(500).json({ status: false, message: 'Server error', error });
